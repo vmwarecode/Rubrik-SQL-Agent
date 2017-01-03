@@ -1,0 +1,10 @@
+name: "auto-generated-pkg-a3185002-4240-4f57-be13-1971e1d432c7"
+productVersion: "7.2.0-SNAPSHOT"
+data:
+- locator: "software-component/Software.RubrikSQLBackupAgent.yaml"
+  name: "Rubrik SQL Backup Agent"
+  description: "Downloads and installs the Rubrik Backup Agent on a SQL VM and adds\
+    \ it to Rubrik as a Windows host. This software blueprint must be configured to\
+    \ run after SQL has been installed and is running, otherwise it will fail to add\
+    \ to Rubrik. Built and tested on Rubrik 3.0.1."
+exportTime: "2017-01-03T18:58:31.765Z"

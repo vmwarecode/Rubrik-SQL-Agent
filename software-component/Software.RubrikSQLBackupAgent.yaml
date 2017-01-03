@@ -1,0 +1,267 @@
+'@type': "SoftwareComponentType"
+createdDate: "2016-12-29T22:33:21.767Z"
+lastUpdated: "2017-01-03T18:57:20.284Z"
+id: "Software.RubrikSQLBackupAgent"
+name: "Rubrik SQL Backup Agent"
+description: "Downloads and installs the Rubrik Backup Agent on a SQL VM and adds\
+  \ it to Rubrik as a Windows host. This software blueprint must be configured to\
+  \ run after SQL has been installed and is running, otherwise it will fail to add\
+  \ to Rubrik. Built and tested on Rubrik 3.0.1."
+publishStatus: "PUBLISHED"
+publishStatusName: "Published"
+schema:
+  fields:
+  - id: "RubrikPassword"
+    label: "RubrikPassword"
+    description: "Password for the Rubrik account used to register the Windows host."
+    dataType:
+      type: "primitive"
+      typeId: "SECURE_STRING"
+    state:
+      dependencies: []
+      facets:
+      - type: "encrypted"
+        value:
+          type: "constant"
+          value:
+            type: "boolean"
+            value: true
+      - type: "mandatory"
+        value:
+          type: "constant"
+          value:
+            type: "boolean"
+            value: true
+      - type: "derivedValue"
+        value:
+          type: "constant"
+          value:
+            type: "secureString"
+            value: ""
+    isMultiValued: false
+  - id: "RubrikServiceAccount"
+    label: "RubrikServiceAccount"
+    description: "The account as which the Windows service will run. Must have permissions\
+      \ to the installed SQL instance."
+    dataType:
+      type: "primitive"
+      typeId: "STRING"
+    state:
+      dependencies: []
+      facets:
+      - type: "mandatory"
+        value:
+          type: "constant"
+          value:
+            type: "boolean"
+            value: true
+      - type: "derivedValue"
+        value:
+          type: "constant"
+          value:
+            type: "string"
+            value: "DOMAIN\\user"
+    isMultiValued: false
+  - id: "RubrikServer"
+    label: "RubrikServer"
+    description: "Rubrik server"
+    dataType:
+      type: "primitive"
+      typeId: "STRING"
+    state:
+      dependencies: []
+      facets:
+      - type: "mandatory"
+        value:
+          type: "constant"
+          value:
+            type: "boolean"
+            value: true
+      - type: "derivedValue"
+        value:
+          type: "constant"
+          value:
+            type: "string"
+            value: "rubrik.domain.com"
+    isMultiValued: false
+  - id: "RubrikUsername"
+    label: "RubrikUsername"
+    description: "Account on Rubrik used to register the Windows host."
+    dataType:
+      type: "primitive"
+      typeId: "STRING"
+    state:
+      dependencies: []
+      facets:
+      - type: "mandatory"
+        value:
+          type: "constant"
+          value:
+            type: "boolean"
+            value: true
+      - type: "derivedValue"
+        value:
+          type: "constant"
+          value:
+            type: "string"
+            value: "admin"
+    isMultiValued: false
+  - id: "host"
+    label: "Container"
+    description: ""
+    dataType:
+      type: "ref"
+      componentTypeId: "com.vmware.csp.iaas.blueprint.service"
+      classId: "Infrastructure.Machine.Schema"
+      label: "Machine"
+    state:
+      dependencies: []
+      facets:
+      - type: "visible"
+        value:
+          type: "constantClause"
+          value:
+            type: "boolean"
+            value: false
+      - type: "mandatory"
+        value:
+          type: "constant"
+          value:
+            type: "boolean"
+            value: true
+      - type: "internal"
+        value:
+          type: "constantClause"
+          value:
+            type: "boolean"
+            value: true
+    isMultiValued: false
+  - id: "RubrikServicePassword"
+    label: "RubrikServicePassword"
+    description: "Password for the account used to run the Windows service."
+    dataType:
+      type: "primitive"
+      typeId: "SECURE_STRING"
+    state:
+      dependencies: []
+      facets:
+      - type: "encrypted"
+        value:
+          type: "constant"
+          value:
+            type: "boolean"
+            value: true
+      - type: "mandatory"
+        value:
+          type: "constant"
+          value:
+            type: "boolean"
+            value: true
+      - type: "derivedValue"
+        value:
+          type: "constant"
+          value:
+            type: "secureString"
+            value: ""
+    isMultiValued: false
+containerFieldId: "host"
+lifecycleTasks:
+- createdDate: "2016-12-29T22:33:21.770Z"
+  lastUpdated: "2017-01-03T18:57:20.284Z"
+  script:
+    scriptContent: "######Trust the Rubrik certs######\nadd-type @\"\n    using System.Net;\n\
+      \    using System.Security.Cryptography.X509Certificates;\n    public class\
+      \ TrustAllCertsPolicy : ICertificatePolicy {\n        public bool CheckValidationResult(\n\
+      \            ServicePoint srvPoint, X509Certificate certificate,\n         \
+      \   WebRequest request, int certificateProblem) {\n            return true;\n\
+      \        }\n    }\n\"@\n[System.Net.ServicePointManager]::CertificatePolicy\
+      \ = New-Object TrustAllCertsPolicy\nWrite-Output \"Creating temp directory and\
+      \ downloading the Rubrik Backup Agent.\"\nNew-Item C:\\Rubrik -Type Directory\
+      \ | Out-Null\nInvoke-WebRequest https://$RubrikServer/connector/RubrikBackupService.zip\
+      \ -OutFile C:\\Rubrik\\RubrikBackupService.zip\n$ZipFilePath = \"C:\\Rubrik\\\
+      RubrikBackupService.zip\"\n$Destination = “C:\\Rubrik”\nAdd-Type -assembly “\
+      system.io.compression.filesystem”\n[io.compression.zipfile]::ExtractToDirectory($ZipFilePath,\
+      \ $Destination)\nWrite-Output \"Installing the Rubrik Backup Agent.\"\nStart-Process\
+      \ C:\\Rubrik\\RubrikBackupService.msi /quiet\nStart-Sleep -s 10\nStop-Service\
+      \ -Name \"Rubrik Backup Service\"\nWrite-Output \"Configuring the agent to run\
+      \ as a service account.\"\nsc.exe config \"Rubrik Backup Service\" obj=$RubrikServiceAccount\
+      \ password=$RubrikServicePassword\n###########Add Rubrik service account permission\
+      \ to logon as a service##########\n$accountToAdd=$RubrikServiceAccount\n#written\
+      \ by Ingo Karstein, http://blog.karstein-consulting.com\n#  v1.0, 01/03/2014\n\
+      \n## <--- Configure here\n\nif( [string]::IsNullOrEmpty($accountToAdd) ) {\n\
+      \tWrite-Host \"no account specified\"\n\texit\n}\n\n## ---> End of Config\n\n\
+      $sidstr = $null\ntry {\n\t$ntprincipal = new-object System.Security.Principal.NTAccount\
+      \ \"$accountToAdd\"\n\t$sid = $ntprincipal.Translate([System.Security.Principal.SecurityIdentifier])\n\
+      \t$sidstr = $sid.Value.ToString()\n} catch {\n\t$sidstr = $null\n}\n\nWrite-Output\
+      \ \"Account: $($accountToAdd)\"\n\nif( [string]::IsNullOrEmpty($sidstr) ) {\n\
+      \tWrite-Output \"Account not found!\"\n\texit -1\n}\n\nWrite-Output \"Account\
+      \ SID: $($sidstr)\"\n\n$tmp = [System.IO.Path]::GetTempFileName()\n\nWrite-Output\
+      \ \"Export current Local Security Policy\"\nsecedit.exe /export /cfg \"$($tmp)\"\
+      \ \n\n$c = Get-Content -Path $tmp \n\n$currentSetting = \"\"\n\nforeach($s in\
+      \ $c) {\n\tif( $s -like \"SeServiceLogonRight*\") {\n\t\t$x = $s.split(\"=\"\
+      ,[System.StringSplitOptions]::RemoveEmptyEntries)\n\t\t$currentSetting = $x[1].Trim()\n\
+      \t}\n}\n\nif( $currentSetting -notlike \"*$($sidstr)*\" ) {\n\tWrite-Output\
+      \ \"Modify Setting \"\"Logon as a Service\"\"\"\n\t\n\tif( [string]::IsNullOrEmpty($currentSetting)\
+      \ ) {\n\t\t$currentSetting = \"*$($sidstr)\"\n\t} else {\n\t\t$currentSetting\
+      \ = \"*$($sidstr),$($currentSetting)\"\n\t}\n\t\n\tWrite-Output \"$currentSetting\"\
+      \n\t\n\t$outfile = @\"\n[Unicode]\nUnicode=yes\n[Version]\nsignature=\"`$CHICAGO`$\"\
+      \nRevision=1\n[Privilege Rights]\nSeServiceLogonRight = $($currentSetting)\n\
+      \"@\n\n\t$tmp2 = [System.IO.Path]::GetTempFileName()\n\t\n\t\n\tWrite-Output\
+      \ \"Import new settings to Local Security Policy\"\n\t$outfile | Set-Content\
+      \ -Path $tmp2 -Encoding Unicode -Force\n\n\t#notepad.exe $tmp2\n\tPush-Location\
+      \ (Split-Path $tmp2)\n\t\n\ttry {\n\t\tsecedit.exe /configure /db \"secedit.sdb\"\
+      \ /cfg \"$($tmp2)\" /areas USER_RIGHTS \n\t\t#write-host \"secedit.exe /configure\
+      \ /db \"\"secedit.sdb\"\" /cfg \"\"$($tmp2)\"\" /areas USER_RIGHTS \"\n\t} finally\
+      \ {\t\n\t\tPop-Location\n\t}\n} else {\n\tWrite-Output \"NO ACTIONS REQUIRED!\
+      \ Account already in \"\"Logon as a Service\"\"\"\n}\n\nWrite-Output \"Done.\"\
+      \n#######################################\nWrite-Output \"Setting up firewall\
+      \ rules to allow inbound access from Rubrik.\"\nnetsh advfirewall firewall add\
+      \ rule name=\"Rubrick Backup Agent\" dir=in action=allow protocol=TCP localport=12800-12801\n\
+      Write-Output \"Starting the Rubrik Backup Agent.\"\nStart-Service -Name \"Rubrik\
+      \ Backup Service\"\n#Clean up temp directory\nRemove-Item C:\\Rubrik -Recurse\
+      \ -Force"
+    isRebootAfter: false
+    scriptTypeId: "powershell"
+  taskDescriptorRef:
+    id: "INSTALL"
+    label: "Install"
+- createdDate: "2016-12-29T22:33:21.770Z"
+  lastUpdated: "2017-01-03T18:57:20.284Z"
+  script:
+    scriptContent: "######Trust the Rubrik certs######\nadd-type @\"\n    using System.Net;\n\
+      \    using System.Security.Cryptography.X509Certificates;\n    public class\
+      \ TrustAllCertsPolicy : ICertificatePolicy {\n        public bool CheckValidationResult(\n\
+      \            ServicePoint srvPoint, X509Certificate certificate,\n         \
+      \   WebRequest request, int certificateProblem) {\n            return true;\n\
+      \        }\n    }\n\"@\n[System.Net.ServicePointManager]::CertificatePolicy\
+      \ = New-Object TrustAllCertsPolicy\n##############\n#####Code adapted from Chris\
+      \ Wahl's community PowerShell \"Connect-Rubrik\" function.\n###Written by Chris\
+      \ Wahl for community usage\n###Twitter: @ChrisWahl\n###GitHub: chriswahl\n###https://github.com/rubrikinc/PowerShell-Module\n\
+      $body = @{\n            username   = $RubrikUsername\n            password =\
+      \ $RubrikPassword\n        }\n$r = Invoke-WebRequest -UseBasicParsing -Uri https://$RubrikServer/api/v1/login\
+      \ -Method POST -Body (ConvertTo-Json -InputObject $body)\n$global:RubrikToken\
+      \ = (ConvertFrom-Json -InputObject $r.Content).token\nWrite-Output \"You are\
+      \ now connected to the Rubrik API.\"\n$auth = [System.Convert]::ToBase64String([System.Text.Encoding]::UTF8.GetBytes($($global:RubrikToken)+':'))\n\
+      $global:RubrikHead = @{\n            'Authorization' = \"Basic $auth\"\n   \
+      \     }\n\n#echo \"Our auth token is $global:RubrikToken\"\n$thishost=(Get-WmiObject\
+      \ win32_computersystem).DNSHostName+\".\"+(Get-WmiObject win32_computersystem).Domain\n\
+      $sethostbody = @(\n            @{hostname = $thishost}\n                   \
+      \ )\n######Add this server to Rubrik as a Windows host######\nWrite-Output \"\
+      Adding this server to Rubrik as a Windows host.\"\nInvoke-WebRequest -UseBasicParsing\
+      \ -Uri https://$RubrikServer/api/v1/host/bulk -Headers $global:RubrikHead -Method\
+      \ POST -Body (ConvertTo-Json -InputObject $sethostbody)"
+    isRebootAfter: false
+    scriptTypeId: "powershell"
+  taskDescriptorRef:
+    id: "CONFIGURE"
+    label: "Configure"
+- createdDate: "2016-12-29T22:41:17.757Z"
+  lastUpdated: "2017-01-03T18:57:20.284Z"
+  script:
+    scriptContent: "####Delete a host entry via its ID\n#Invoke-WebRequest -Uri https://$RubrikServer/api/v1/host/bulk?ids=3349b669-b30a-4cd5-a7a2-1c60fb3d0ca2\
+      \ -Headers $global:RubrikHead -Method DELETE"
+    isRebootAfter: false
+    scriptTypeId: "powershell"
+  taskDescriptorRef:
+    id: "TEARDOWN"
+    label: "Uninstall"
